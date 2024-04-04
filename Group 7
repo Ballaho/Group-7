@@ -1,0 +1,200 @@
+database
+
+import 'package:sqflite/sqflite.dart';
+import 'package:path/path.dart';
+
+class DatabaseHelper {
+  static Database? _database;
+  static final _tableName = 'users';
+
+  static Future<Database> get database async {
+    if (_database != null) return _database!;
+    _database = await initDatabase();
+    return _database!;
+  }
+
+  static Future<Database> initDatabase() async {
+    String path = join(await getDatabasesPath(), 'users.db');
+    return await openDatabase(
+      path,
+      version: 1,
+      onCreate: (Database db, int version) async {
+        await db.execute(
+            'CREATE TABLE $_tableName(id INTEGER PRIMARY KEY, username TEXT, password TEXT, name TEXT, birthday TEXT, email TEXT)');
+      },
+    );
+  }
+
+  static Future<int> insert(Map<String, dynamic> row) async {
+    Database db = await database;
+    return await db.insert(_tableName, row);
+  }
+
+  static Future<Map<String, dynamic>?> queryUser(String username) async {
+    Database db = await database;
+    List<Map<String, dynamic>> result = await db.query(
+      _tableName,
+      where: 'username = ?',
+      whereArgs: [username],
+    );
+    return result.isNotEmpty ? result.first : null;
+  }
+}
+
+
+
+home
+import 'package:flutter/material.dart';
+
+class HomeScreen extends StatelessWidget {
+  final Map<String, dynamic> userData;
+
+  HomeScreen(this.userData);
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      body: Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Text('Name: ${userData['name']}'),
+            Text('Age: ${DateTime.now().year - int.parse(userData['birthday'].split('-')[0])}'),
+            Text('Address: '), // Add user's address field here
+            Text('Email: ${userData['email']}'),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+
+login
+
+import 'package:flutter/material.dart';
+import 'package:your_project_name/home.dart';
+import 'package:your_project_name/database.dart';
+
+class LoginScreen extends StatelessWidget {
+  final TextEditingController usernameController = TextEditingController();
+  final TextEditingController passwordController = TextEditingController();
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      body: Padding(
+        padding: const EdgeInsets.all(20.0),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            TextField(
+              controller: usernameController,
+              decoration: InputDecoration(
+                labelText: 'Username',
+              ),
+            ),
+            TextField(
+              controller: passwordController,
+              obscureText: true,
+              decoration: InputDecoration(
+                labelText: 'Password',
+              ),
+            ),
+            SizedBox(height: 20),
+            ElevatedButton(
+              onPressed: () async {
+                String username = usernameController.text.trim();
+                String password = passwordController.text.trim();
+
+                Map<String, dynamic>? user = await DatabaseHelper.queryUser(username);
+
+                if (user != null && user['password'] == password) {
+                  Navigator.pushReplacement(
+                    context,
+                    MaterialPageRoute(builder: (context) => HomeScreen(user)),
+                  );
+                } else {
+                  // Show error message or dialog for invalid credentials
+                }
+              },
+              child: Text('Login'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+register
+import 'package:flutter/material.dart';
+import 'package:your_project_name/database.dart';
+
+class RegisterScreen extends StatelessWidget {
+  final TextEditingController usernameController = TextEditingController();
+  final TextEditingController passwordController = TextEditingController();
+  final TextEditingController nameController = TextEditingController();
+  final TextEditingController birthdayController = TextEditingController();
+  final TextEditingController emailController = TextEditingController();
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      body: Padding(
+        padding: const EdgeInsets.all(20.0),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            TextField(
+              controller: usernameController,
+              decoration: InputDecoration(
+                labelText: 'Username',
+              ),
+            ),
+            TextField(
+              controller: passwordController,
+              obscureText: true,
+              decoration: InputDecoration(
+                labelText: 'Password',
+              ),
+            ),
+            TextField(
+              controller: nameController,
+              decoration: InputDecoration(
+                labelText: 'Name',
+              ),
+            ),
+            TextField(
+              controller: birthdayController,
+              decoration: InputDecoration(
+                labelText: 'Birthday (YYYY-MM-DD)',
+              ),
+            ),
+            TextField(
+              controller: emailController,
+              decoration: InputDecoration(
+                labelText: 'Email',
+              ),
+            ),
+            SizedBox(height: 20),
+            ElevatedButton(
+              onPressed: () async {
+                Map<String, dynamic> user = {
+                  'username': usernameController.text.trim(),
+                  'password': passwordController.text.trim(),
+                  'name': nameController.text.trim(),
+                  'birthday': birthdayController.text.trim(),
+                  'email': emailController.text.trim(),
+                };
+                await DatabaseHelper.insert(user);
+                Navigator.pop(context); // Navigate back to login screen
+              },
+              child: Text('Register'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
